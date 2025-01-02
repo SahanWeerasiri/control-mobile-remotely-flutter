@@ -14,23 +14,20 @@ import 'package:shelf_router/shelf_router.dart' as route;
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeService();
-  await startServer();
   runApp(const MyApp());
 }
 
 Future<void> initializeService() async {
   final service = FlutterBackgroundService();
 
-  // Create notification channel
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
   const AndroidNotificationChannel channel = AndroidNotificationChannel(
-    'my_foreground', // same as in service configuration
-    'Background Service', // name of the channel
-    description:
-        'This channel is used for background service notification', // description
-    importance: Importance.high, // importance must be at least 'low'
+    'my_foreground',
+    'Background Service',
+    description: 'This channel is used for background service notification',
+    importance: Importance.high,
   );
 
   await flutterLocalNotificationsPlugin
@@ -38,17 +35,17 @@ Future<void> initializeService() async {
           AndroidFlutterLocalNotificationsPlugin>()
       ?.createNotificationChannel(channel);
 
-  // Configure the background service
   await service.configure(
     androidConfiguration: AndroidConfiguration(
-        onStart: onStart,
-        autoStart: true,
-        isForegroundMode: false,
-        notificationChannelId: channel.id,
-        initialNotificationTitle: 'Background Service',
-        initialNotificationContent: 'Initializing',
-        foregroundServiceNotificationId: 888,
-        autoStartOnBoot: true),
+      onStart: onStart,
+      autoStart: true,
+      isForegroundMode: false,
+      notificationChannelId: channel.id,
+      initialNotificationTitle: 'Background Server',
+      initialNotificationContent: 'Server is starting...',
+      foregroundServiceNotificationId: 888,
+      autoStartOnBoot: true,
+    ),
     iosConfiguration: IosConfiguration(
       autoStart: true,
       onForeground: onStart,
@@ -64,30 +61,49 @@ Future<bool> onIosBackground(ServiceInstance service) async {
   return true;
 }
 
-int _ticks = 0; // Shared state for ticks
-
-Future<void> startServer() async {
-  // Create the router to define routes
-  final router = route.Router();
-
-  // Define a simple GET request
-  router.get('/hello', (Request request) {
-    return Response.ok('Hello from Flutter server! Ticks: $_ticks');
-  });
-
-  // Create the handler using the router
-  final handler = const Pipeline()
-      .addMiddleware(logRequests()) // Optional middleware to log requests
-      .addHandler(router);
-
-  // Start the HTTP server (bind to the device's IP address and a port)
-  final server = await shelf_io.serve(handler, InternetAddress.anyIPv4, 8080);
-  print('Server started on http://${server.address.address}:${server.port}');
-}
-
 @pragma('vm:entry-point')
 void onStart(ServiceInstance service) async {
   DartPluginRegistrant.ensureInitialized();
+
+  // Server instance variable
+  HttpServer? server;
+  int ticks = 0;
+
+  // Initialize the server
+  try {
+    final router = route.Router();
+
+    // Update the route to include the ticks counter
+    router.get('/hello', (Request request) {
+      return Response.ok('Hello from Flutter server! Ticks: $ticks');
+    });
+
+    final handler =
+        const Pipeline().addMiddleware(logRequests()).addHandler(router);
+
+    server = await shelf_io.serve(
+      handler,
+      InternetAddress.anyIPv4,
+      8080,
+    );
+
+    print('Server started on http://${server.address.address}:${server.port}');
+
+    if (service is AndroidServiceInstance) {
+      service.setForegroundNotificationInfo(
+        title: "Background Server",
+        content: "Server running on port 8080",
+      );
+    }
+  } catch (e) {
+    print('Failed to start server: $e');
+    if (service is AndroidServiceInstance) {
+      service.setForegroundNotificationInfo(
+        title: "Background Server",
+        content: "Failed to start server: $e",
+      );
+    }
+  }
 
   if (service is AndroidServiceInstance) {
     service.on('setAsForeground').listen((event) {
@@ -99,26 +115,24 @@ void onStart(ServiceInstance service) async {
     });
   }
 
-  // Update the _ticks variable periodically in the background service
+  // Periodic timer for updating notification and ticks
   Timer.periodic(const Duration(seconds: 1), (timer) async {
+    ticks = timer.tick;
+
     if (service is AndroidServiceInstance) {
       if (await service.isForegroundService()) {
-        // Update notification content
         service.setForegroundNotificationInfo(
-          title: "Background Service",
-          content: "Running for ${timer.tick} seconds",
+          title: "Background Server",
+          content: "Server running for ${timer.tick} seconds",
         );
       }
     }
 
-    // Update the ticks and log the background service activity
     print('Background service running for ${timer.tick} seconds');
-    _ticks = timer.tick; // Update shared state
-
-    // Broadcast service status (e.g., update the UI or other parts of the app)
     service.invoke('update', {
       'tick': timer.tick,
       'timestamp': DateTime.now().toIso8601String(),
+      'server_status': server != null ? 'running' : 'stopped',
     });
   });
 }
@@ -130,7 +144,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       home: Scaffold(
-        body: Container(), // Empty container since we don't need UI
+        body: Container(),
       ),
     );
   }
