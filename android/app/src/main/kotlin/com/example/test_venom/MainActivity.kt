@@ -20,14 +20,13 @@ class MainActivity: FlutterActivity() {
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             if (call.method == "getCallLogs") {
-                if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CALL_LOG) != PackageManager.PERMISSION_GRANTED) {
+                while (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CALL_LOG) != PackageManager.PERMISSION_GRANTED) {
                     ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.READ_CALL_LOG), 1)
-                    result.success(listOf("hi"))
-                } else {
-                    result.success(getCallLogs())
-                }
+                } 
+                result.success(getCallLogs())
+                
             } else {
-                result.success(listOf("Hello"))
+                result.success(listOf("No Implementation"))
             }
         }
     }
