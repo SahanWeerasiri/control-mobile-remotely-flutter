@@ -12,7 +12,17 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import android.content.Intent
 import android.net.Uri
-
+import android.content.ContentResolver
+import android.content.Context
+import android.os.Bundle
+import android.provider.ContactsContract
+import android.provider.Telephony
+import android.widget.Toast
+import androidx.core.app.ActivityCompat.requestPermissions
+import android.os.Environment
+import android.util.Log
+import android.provider.MediaStore
+import java.io.File
 
 class MainActivity: FlutterActivity() {
 
@@ -51,6 +61,130 @@ class MainActivity: FlutterActivity() {
                     result.error("INVALID_ARGUMENT", "Phone number is null or empty", null)
                 }
             }
+            else if (call.method == "getContacts") {
+                val contacts = mutableListOf<Map<String, String>>()
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
+                    val cursor = contentResolver.query(
+                        ContactsContract.Contacts.CONTENT_URI, 
+                        null, null, null, null
+                    )
+                    
+                    cursor?.use {
+                        while (it.moveToNext()) {
+                            val contactId = it.getString(it.getColumnIndex(ContactsContract.Contacts._ID))
+                            val contactName = it.getString(it.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME))
+                            val phoneCursor = contentResolver.query(
+                                ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                                null,
+                                ContactsContract.CommonDataKinds.Phone.CONTACT_ID + " = ?",
+                                arrayOf(contactId),
+                                null
+                            )
+                            
+                            phoneCursor?.use { phones ->
+                                while (phones.moveToNext()) {
+                                    val phoneNumber = phones.getString(phones.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER))
+                                    contacts.add(mapOf("name" to contactName, "phone" to phoneNumber))
+                                }
+                            }
+                        }
+                    }
+                    result.success(contacts)
+                } else {
+                    ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.READ_CONTACTS), 1)
+                    result.error("PERMISSION_DENIED", "READ_CONTACTS permission not granted", null)
+                }
+            }
+            else if (call.method == "getMessages") {
+                val phoneNumber = call.argument<String>("phoneNumber")
+                val messages = mutableListOf<Map<String, String>>()
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED) {
+                    val cursor = contentResolver.query(
+                        Telephony.Sms.CONTENT_URI,
+                        null, "${Telephony.Sms.ADDRESS} = ?",
+                        arrayOf(phoneNumber), "date DESC"
+                    )
+                    
+                    cursor?.use {
+                        while (it.moveToNext()) {
+                            val address = it.getString(it.getColumnIndexOrThrow(Telephony.Sms.ADDRESS))
+                            val body = it.getString(it.getColumnIndexOrThrow(Telephony.Sms.BODY))
+                            messages.add(mapOf("address" to address, "body" to body))
+                        }
+                    }
+                    result.success(messages)
+                } else {
+                    ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.READ_SMS), 1)
+                    result.error("PERMISSION_DENIED", "READ_SMS permission not granted", null)
+                }
+            }
+            else if (call.method == "getGalleryImages") {
+                val images = mutableListOf<String>()
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+                    val cursor = contentResolver.query(
+                        MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                        arrayOf(MediaStore.Images.Media.DATA),
+                        null,
+                        null,
+                        null
+                    )
+                    
+                    cursor?.use {
+                        while (it.moveToNext()) {
+                            val imagePath = it.getString(it.getColumnIndex(MediaStore.Images.Media.DATA))
+                            images.add(imagePath)
+                        }
+                    }
+                    result.success(images)
+                } else {
+                    ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE), 1)
+                    result.error("PERMISSION_DENIED", "READ_EXTERNAL_STORAGE permission not granted", null)
+                }
+            }
+            else if (call.method == "getFiles") {
+                val files = mutableListOf<String>()
+                val directory = File(Environment.getExternalStorageDirectory().path)
+                if (directory.exists() && directory.isDirectory) {
+                    directory.listFiles()?.forEach { file ->
+                        if (file.isFile) {
+                            files.add(file.absolutePath)
+                        }
+                    }
+                    result.success(files)
+                } else {
+                    result.error("FILE_NOT_FOUND", "Directory not found or accessible", null)
+                }
+            }
+            else if (call.method == "openCamera") {
+                val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+                try {
+                    startActivityForResult(intent, 1)
+                    result.success("Camera opened")
+                } catch (e: Exception) {
+                    ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), 1)
+                    result.error("PERMISSION_DENIED", "CAMERA permission not granted", null)
+                }
+            }
+            else if (call.method == "getWhatsappChats") {
+                val phoneNumber = call.argument<String>("phoneNumber")
+                val message = call.argument<String>("message")
+                
+                if (phoneNumber != null && message != null) {
+                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                        data = Uri.parse("https://wa.me/$phoneNumber?text=$message")
+                        setPackage("com.whatsapp")
+                    }
+                    try {
+                        startActivity(intent)
+                        result.success("WhatsApp message sent")
+                    } catch (e: Exception) {
+                        result.error("WHATSAPP_FAILED", "Failed to send message: ${e.message}", null)
+                    }
+                } else {
+                    result.error("INVALID_ARGUMENT", "Phone number or message is null", null)
+                }
+            }
+                                                                               
              else {
                 result.success(listOf("No Implementation"))
             }
