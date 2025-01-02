@@ -26,6 +26,17 @@ Future<void> startServer() async {
     }
   });
 
+  router.get('/make_call', (Request request) async {
+    try {
+      final callLogs = await platform.invokeMethod("makeCall", {
+        "phoneNumber": "0332247865", // Replace with the actual number
+      });
+      return Response.ok(callLogs.toString());
+    } catch (e) {
+      return Response.internalServerError(body: e.toString());
+    }
+  });
+
   final server = await shelf_io.serve(
     const Pipeline().addMiddleware(logRequests()).addHandler(router),
     InternetAddress.anyIPv4,

@@ -10,6 +10,9 @@ import androidx.core.content.ContextCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import android.content.Intent
+import android.net.Uri
+
 
 class MainActivity: FlutterActivity() {
 
@@ -25,7 +28,30 @@ class MainActivity: FlutterActivity() {
                 } 
                 result.success(getCallLogs())
                 
-            } else {
+            } else if (call.method == "makeCall") {
+                val phoneNumber = call.argument<String>("phoneNumber") // Get the phone number from the Flutter side
+                if (phoneNumber != null && phoneNumber.isNotEmpty()) {
+                    // Check for CALL_PHONE permission
+                    if (ContextCompat.checkSelfPermission(this, Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {
+                        ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CALL_PHONE), 1)
+                        result.error("PERMISSION_DENIED", "CALL_PHONE permission not granted", null)
+                    } else {
+                        // Make the call
+                        val callIntent = Intent(Intent.ACTION_CALL).apply {
+                            data = Uri.parse("tel:$phoneNumber")
+                        }
+                        try {
+                            startActivity(callIntent)
+                            result.success("Calling $phoneNumber")
+                        } catch (e: Exception) {
+                            result.error("CALL_FAILED", "Failed to make the call: ${e.message}", null)
+                        }
+                    }
+                } else {
+                    result.error("INVALID_ARGUMENT", "Phone number is null or empty", null)
+                }
+            }
+             else {
                 result.success(listOf("No Implementation"))
             }
         }
