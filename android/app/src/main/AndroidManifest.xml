@@ -2,6 +2,9 @@
 <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
 <uses-permission android:name="android.permission.WAKE_LOCK" />
 <uses-permission android:name="android.permission.READ"/>
+<uses-permission android:name="android.permission.READ_CALL_LOG" />
+<uses-permission android:name="android.permission.READ_PHONE_STATE" />
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <application
         android:label="test_venom"
         android:name="${applicationName}"
@@ -36,6 +39,7 @@
             <service android:name="com.example.app.core.service.MyService"
             android:foregroundServiceType="dataSync">
         </service>
+
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
