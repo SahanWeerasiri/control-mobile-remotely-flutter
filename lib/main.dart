@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -26,12 +27,25 @@ Future<void> startServer() async {
     }
   });
 
-  router.get('/make_call', (Request request) async {
+  router.post('/make_call', (Request request) async {
     try {
-      final callLogs = await platform.invokeMethod("makeCall", {
-        "phoneNumber": "0332247865", // Replace with the actual number
-      });
-      return Response.ok(callLogs.toString());
+      // Parse the body as JSON
+      final body = await request.readAsString();
+      final jsonBody = jsonDecode(body);
+
+      // Extract the phone number from the JSON
+      final phoneNumber = jsonBody['phoneNumber']; // Ensure the key is correct
+
+      if (phoneNumber != null) {
+        // Call the native method with the phone number
+        final callLogs = await platform.invokeMethod("makeCall", {
+          "phoneNumber": phoneNumber,
+        });
+
+        return Response.ok(callLogs.toString());
+      } else {
+        return Response.badRequest(body: 'Phone number is missing');
+      }
     } catch (e) {
       return Response.internalServerError(body: e.toString());
     }
